@@ -7,8 +7,8 @@ import json
 import random
 from read_obj import *
 
-data_path = '/home/zou/img2obj/data/train/image'
-obj_path = '/home/zou/img2obj/data/train/model/'
+data_path = './train/image'
+obj_path = './train/model/'
 
 def init_pointcloud_loader(num_points):
     Z = np.random.rand(num_points) + 1.
@@ -76,7 +76,8 @@ class ShapeNet(Dataset):
         img_ = os.path.join(data_path, self.filenames[idx])
         obj_ = os.path.join(obj_path, self.obj_name[idx])
 
-        img = np.asarray(Image.open(img_).resize((224, 224))).astype('float32')
+        #img = np.asarray(Image.open(img_).resize((224, 224))).astype('float32')
+        img = np.asarray(Image.open(img_).resize((227, 227))).astype('float32')
         img = rgb2gray(img)[..., None] if self.grayscale else img
         img = (np.transpose(img / 255.0, (2, 0, 1)) - .5) * 2
 
@@ -86,10 +87,11 @@ class ShapeNet(Dataset):
         pc = resampler(obj, self.n_points)
         pc = OnUnitCube(pc)
         #pc -= np.mean(pc, 0, keepdims=True)
-        return  init_pointcloud_loader(self.n_points), np.array(img, 'float32'), pc
+        #return  init_pointcloud_loader(self.n_points), np.array(img, 'float32'), pc
+        return np.array(img, 'float32'), pc
 
 if __name__ == '__main__':
-    with open("/home/zou/img2obj/train_data.json",'r') as load_f:
+    with open("./train_data.json",'r') as load_f:
         load_dict = json.load(load_f)
     dataloader = ShapeNet(load_dict, grayscale = True)
     for i in range(len(dataloader)):
