@@ -47,14 +47,14 @@ class ObjLoader(object):
 
 
 if __name__ == '__main__':
-    train_data_path = './data/train/data_info/train_set.json'
+    train_data_path = './train/data_info/train_set.json'
     real_train = './train_data.json'
     files = []
     with open(train_data_path,'r') as load_f:
         load_dict = json.load(load_f)
     print('total:', len(load_dict))
     for key in load_dict:
-        path = './data/train/model/' + key['model'] +'.obj'
+        path = './train/model/' + key['model'] +'.obj'
         print('........................')
         print(key['model'])
 

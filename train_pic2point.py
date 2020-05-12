@@ -21,8 +21,8 @@ from sklearn.model_selection import train_test_split
 from data_loader import ShapeNet
 from torch.autograd import Variable
 import torch
-import model.chamfer.dist_chamfer as ext
-distChamfer = ext.chamferDist()
+from dist_chamfer import chamferDist
+distChamfer = chamferDist()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize', type=int, default=8, help='input batch size')
@@ -63,7 +63,7 @@ def main():
     global args
     opt = parser.parse_args()
     print (opt)
-    opt.dataroot = "/home/zou/img2obj/train_data.json"
+    opt.dataroot = "./train_data.json"
     opt.manualSeed = random.randint(1, 10000) # fix seed
     print("Random Seed: ", opt.manualSeed)
     random.seed(opt.manualSeed)
