@@ -1,6 +1,6 @@
 # 3D-object-reconstruction-from-a-single-image
 
-1. Download the dataset from the reconstruction_trainval_data_20200404.csv.
+1. Download the dataset from the ???.
 
 2. Install the requirements.
 
