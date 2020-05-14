@@ -21,14 +21,16 @@ from sklearn.model_selection import train_test_split
 from data_loader import ShapeNet
 from torch.autograd import Variable
 import torch
-from dist_chamfer import chamferDist
-distChamfer = chamferDist()
+import model.chamfer.dist_chamfer as ext
+import matplotlib.pyplot as plt
+import neuralnet_pytorch as nnt
+distChamfer = ext.chamferDist()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--batchSize', type=int, default=8, help='input batch size')
 parser.add_argument('--num_points', type=int, default=2048, help='input batch size')
 parser.add_argument('--workers', type=int, help='number of data loading workers', default=8)
-parser.add_argument('--nepoch', type=int, default=100, help='number of epochs to train for')
+parser.add_argument('--nepoch', type=int, default=30, help='number of epochs to train for')
 parser.add_argument('--model', type=str, default='',  help='model path')
 
 def batch_pairwise_dist(x, y):
@@ -63,7 +65,7 @@ def main():
     global args
     opt = parser.parse_args()
     print (opt)
-    opt.dataroot = "./train_data.json"
+    opt.dataroot = "/home/zou/img2obj/train_data.json"
     opt.manualSeed = random.randint(1, 10000) # fix seed
     print("Random Seed: ", opt.manualSeed)
     random.seed(opt.manualSeed)
@@ -85,33 +87,37 @@ def main():
     print("model building...")
     model = pic2points(num_points=opt.num_points)
     model.cuda()
-
+    
     # load pre-existing weights
     if opt.model != '':
         model.load_state_dict(torch.load(opt.model))
 
-    optimizer = torch.optim.Adam(model.parameters(),lr = 1e-4, weight_decay=1e-4)
+    optimizer = torch.optim.Adam(model.parameters(),lr = 5e-4, weight_decay=1e-4)
     num_batch = len(dataset) / opt.batchSize
     best_loss = 100
     
+
+    visual_loss_train = []
+    visual_loss_test = []
     print('training mode ------------------')
     for epoch in range(opt.nepoch):
         loss_epoch_train = 0
         loss_epoch_test = 0
         print("epoch:"+str(epoch))
         model.train()
-        if epoch > 50:
-            optimizer.param_groups[0]['lr'] = 5e-5
-        if epoch > 80:
+        if epoch > 20:
             optimizer.param_groups[0]['lr'] = 1e-5
         for i, data in enumerate(dataloader, 0):
-            im, points = data
+            _, im, points = data
             im, points = Variable(im), Variable(points)
             im, points = im.cuda(), points.cuda()
             pred = model(im)
             #loss = batch_NN_loss(pred, points).cuda()
-            dist1, dist2 = distChamfer(points, pred)
-            loss = 1000*(torch.mean(dist1) + torch.mean(dist2))
+            loss_1 =  nnt.chamfer_loss(pred, points, reduce='mean')
+            loss_2 =  nnt.emd_loss(pred, points, reduce='mean')            
+
+            loss = 100*loss_1 + loss_2/100
+           # print('chamfer', loss_1, 'emd_loss', loss_2)
 
             optimizer.zero_grad()
             loss.backward()
@@ -122,26 +128,45 @@ def main():
             if i % 50 is 0:
                 print("training loss is:", loss.cpu().detach().numpy())
 
-        print("epoch {} training loss is : {}".format(epoch, loss_epoch_train/(i+1)))
+        print("epoch {} training loss is : {}".format(epoch, loss_epoch_train/(len(dataloader))))
 
+        visual_loss_train.append(loss_epoch_train/(len(dataloader)))
         loss_test = 0
         model.eval()
 
         with torch.no_grad():
             for i, data in enumerate(testdataloader, 0):
-                im_test, points_test = data
+                _, im_test, points_test = data
                 im_test, points_test = Variable(im_test), Variable(points_test)
                 im_test, points_test = im_test.cuda(), points_test.cuda()
                 pred_test = model(im_test)
               #  loss_test = batch_NN_loss(pred_test, points_test).cuda()
-                dist1, dist2 = distChamfer(points_test, pred_test)
-                loss_test = 100*(torch.mean(dist1) + torch.mean(dist2))
+                loss_1 =  nnt.chamfer_loss(pred_test, points_test, reduce='mean')
+                loss_2 =  nnt.emd_loss(pred_test, points_test, reduce='mean') 
+                #dist1, dist2 = distChamfer(points_test, pred_test)
+                loss_test = 100*loss_1 + loss_2/100
                 loss_epoch_test = loss_epoch_test + loss_test
 
-        print("epoch {} testing loss is : {}".format(epoch, loss_epoch_test/(i+1)))
+        print("epoch {} testing loss is : {}".format(epoch, loss_epoch_test/(len(testdataloader))))
+        visual_loss_test.append(loss_epoch_test/(len(testdataloader)))
 
-        if loss_epoch_test/(i+1) < best_loss:
-            torch.save(model, 'model_1.pkl')
+        if visual_loss_test[-1] < best_loss:
+            best_loss = visual_loss_test[-1]
+            torch.save(model, './results/model_1.pkl')
+            print('save model, the best loss is', best_loss)
+
+
+    times = list(range(len(visual_loss_test)))
+        
+    fig = plt.figure()
+    ax.plot(times, visual_loss_test)
+    ax.plot(times, visual_loss_train)
+    ax.set_xlabel("iteration")
+    ax.set_ylabel("loss")
+    plt.savefig('./results/run1.png')
+    plt.show()
+
+
 
 if __name__ == '__main__':
     num_cuda = cuda.device_count()
